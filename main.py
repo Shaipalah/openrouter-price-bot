@@ -20,12 +20,20 @@ def get_price():
         res.raise_for_status()
         for model in res.json()["data"]:
             if model["id"] == TARGET_MODEL:
-                # Ищем конкретного провайдера в списке endpoints
-                for endpoint in model.get("endpoints", []):
-                    if endpoint.get("provider_name") == TARGET_PROVIDER:
+                print(f"✅ Модель найдена: {model['id']}")
+                endpoints = model.get("endpoints", [])
+                if not endpoints:
+                    print("❌ У этой модели нет списка провайдеров (endpoints пуст).")
+                    print("Цена на верхнем уровне:", model.get("pricing"))
+                    return None
+                
+                for endpoint in endpoints:
+                    prov_name = endpoint.get("provider_name")
+                    print(f"🔍 Доступный провайдер: '{prov_name}'")
+                    if prov_name == TARGET_PROVIDER:
                         return float(endpoint["pricing"]["prompt"])
     except Exception as e:
-        print("Ошибка при запросе:", e)
+        print("Ошибка:", e)
     return None
 
 def main():
