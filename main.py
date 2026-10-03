@@ -18,20 +18,29 @@ def get_price():
     try:
         res = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
         res.raise_for_status()
-        for model in res.json()["data"]:
-            if model["id"] == TARGET_MODEL:
-                print(f"✅ Модель найдена: {model['id']}")
+        models = res.json()["data"]
+        print(f"Всего моделей в API: {len(models)}")
+        
+        found_any = False
+        for model in models:
+            model_id = model["id"]
+            # Ищем все модели, в названии которых есть 'glm-5.2'
+            if "glm-5.2" in model_id.lower():
+                found_any = True
+                print(f"Найдена модель: {model_id}")
                 endpoints = model.get("endpoints", [])
                 if not endpoints:
-                    print("❌ У этой модели нет списка провайдеров (endpoints пуст).")
-                    print("Цена на верхнем уровне:", model.get("pricing"))
-                    return None
-                
+                    print(f"  ⚠️ У модели {model_id} нет списка провайдеров (endpoints пуст).")
+                    continue
                 for endpoint in endpoints:
                     prov_name = endpoint.get("provider_name")
-                    print(f"🔍 Доступный провайдер: '{prov_name}'")
+                    print(f"  🔍 Провайдер: '{prov_name}'")
                     if prov_name == TARGET_PROVIDER:
                         return float(endpoint["pricing"]["prompt"])
+        
+        if not found_any:
+            print("Модели с 'glm-5.2' в названии не найдены.")
+            
     except Exception as e:
         print("Ошибка:", e)
     return None
