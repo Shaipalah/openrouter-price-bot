@@ -15,34 +15,31 @@ def send_telegram(msg):
     requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": msg})
 
 def get_price():
+    # Прямой запрос к эндпоинтам конкретной модели
+    url = f"https://openrouter.ai/api/v1/models/{TARGET_MODEL}/endpoints"
     try:
-        res = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
-        res.raise_for_status()
-        models = res.json()["data"]
-        print(f"Всего моделей в API: {len(models)}")
-        
-        found_any = False
-        for model in models:
-            model_id = model["id"]
-            # Ищем все модели, в названии которых есть 'glm-5.2'
-            if "glm-5.2" in model_id.lower():
-                found_any = True
-                print(f"Найдена модель: {model_id}")
-                endpoints = model.get("endpoints", [])
-                if not endpoints:
-                    print(f"  ⚠️ У модели {model_id} нет списка провайдеров (endpoints пуст).")
-                    continue
-                for endpoint in endpoints:
-                    prov_name = endpoint.get("provider_name")
-                    print(f"  🔍 Провайдер: '{prov_name}'")
-                    if prov_name == TARGET_PROVIDER:
-                        return float(endpoint["pricing"]["prompt"])
-        
-        if not found_any:
-            print("Модели с 'glm-5.2' в названии не найдены.")
+        res = requests.get(url, timeout=10)
+        if res.status_code != 200:
+            print(f"Ошибка API: {res.status_code} - {res.text}")
+            return None
             
+        data = res.json().get("data", {})
+        endpoints = data.get("endpoints", [])
+        
+        if not endpoints:
+            print("❌ Список провайдеров для этой модели пуст (возможно, модель недоступна).")
+            return None
+            
+        print(f"✅ Модель {TARGET_MODEL} найдена. Доступные провайдеры:")
+        for endpoint in endpoints:
+            prov_name = endpoint.get("provider_name")
+            print(f"  🔍 '{prov_name}'")  # Печатаем имя каждого провайдера
+            
+            if prov_name == TARGET_PROVIDER:
+                return float(endpoint["pricing"]["prompt"])
+                
     except Exception as e:
-        print("Ошибка:", e)
+        print("Ошибка при запросе:", e)
     return None
 
 def main():
