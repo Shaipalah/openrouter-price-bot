@@ -4,7 +4,7 @@ import os
 
 # --- НАСТРОЙКИ (ВПИШИ СВОИ ЗНАЧЕНИЯ) ---
 TARGET_MODEL = "z-ai/glm-5.2"   # ID модели
-TARGET_PROVIDER = "Baidu Qianfan"          # Имя провайдера (например, Together, Fireworks, DeepInfra)
+TARGET_PROVIDER = "Baidu"          # Имя провайдера (например, Together, Fireworks, DeepInfra)
 
 TELEGRAM_TOKEN = os.environ.get("8732449791:AAGw1eh5RFGkrtxJcnbhmv_OMk6DWL_46Xs")
 TELEGRAM_CHAT_ID = os.environ.get("6581546308")
