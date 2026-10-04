@@ -6,8 +6,8 @@ import os
 TARGET_MODEL = "z-ai/glm-5.2"   # ID модели
 TARGET_PROVIDER = "Baidu"          # Имя провайдера (например, Together, Fireworks, DeepInfra)
 
-TELEGRAM_TOKEN = os.environ.get("8732449791:AAGw1eh5RFGkrtxJcnbhmv_OMk6DWL_46Xs")
-TELEGRAM_CHAT_ID = os.environ.get("6581546308")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 PRICE_FILE = "last_price.json"
 
 def send_telegram(msg):
