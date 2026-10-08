@@ -12,7 +12,8 @@ PRICE_FILE = "last_price.json"
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": msg})
+    response = requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": msg})
+    print(f"ОТВЕТ TELEGRAM: {response.status_code} - {response.text}")
 
 def get_price():
     # Прямой запрос к эндпоинтам конкретной модели
