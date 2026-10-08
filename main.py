@@ -16,7 +16,6 @@ def send_telegram(msg):
     print(f"ОТВЕТ TELEGRAM: {response.status_code} - {response.text}")
 
 def get_price():
-    # Прямой запрос к эндпоинтам конкретной модели
     url = f"https://openrouter.ai/api/v1/models/{TARGET_MODEL}/endpoints"
     try:
         res = requests.get(url, timeout=10)
@@ -28,16 +27,31 @@ def get_price():
         endpoints = data.get("endpoints", [])
         
         if not endpoints:
-            print("❌ Список провайдеров для этой модели пуст (возможно, модель недоступна).")
+            print("❌ Список провайдеров для этой модели пуст.")
             return None
             
         print(f"✅ Модель {TARGET_MODEL} найдена. Доступные провайдеры:")
+        
+        baidu_prices = []  # сюда собираем все цены от Baidu
         for endpoint in endpoints:
             prov_name = endpoint.get("provider_name")
-            print(f"  🔍 '{prov_name}'")  # Печатаем имя каждого провайдера
-            
+            # Если это Baidu, сохраняем цену и информацию о квантовании
             if prov_name == TARGET_PROVIDER:
-                return float(endpoint["pricing"]["prompt"])
+                price = float(endpoint["pricing"]["prompt"])
+                # Пытаемся получить название эндпоинта или квантование
+                quant = endpoint.get("quantization", "unknown")
+                name = endpoint.get("name", "unnamed")
+                baidu_prices.append((price, quant, name))
+                print(f"  🔍 Найден Baidu: цена={price}, квантование={quant}, имя={name}")
+        
+        if not baidu_prices:
+            print(f"❌ Провайдер {TARGET_PROVIDER} не найден среди эндпоинтов.")
+            return None
+        
+        # Выбираем самый дешёвый вариант
+        cheapest = min(baidu_prices, key=lambda x: x[0])
+        print(f"✅ Выбран самый дешёвый Baidu: цена={cheapest[0]}, квантование={cheapest[1]}, имя={cheapest[2]}")
+        return cheapest[0]
                 
     except Exception as e:
         print("Ошибка при запросе:", e)
