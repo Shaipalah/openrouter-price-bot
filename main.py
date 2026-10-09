@@ -2,82 +2,101 @@ import requests
 import json
 import os
 
-# --- НАСТРОЙКИ (ВПИШИ СВОИ ЗНАЧЕНИЯ) ---
-TARGET_MODEL = "z-ai/glm-5.2"   # ID модели
-TARGET_PROVIDER = "Baidu"          # Имя провайдера (например, Together, Fireworks, DeepInfra)
-
+# --- НАСТРОЙКИ ---
+TARGET_MODEL = "z-ai/glm-5.2"
+TARGET_PROVIDER = "Baidu"
+TARGET_QUANTS = ["fp4", "fp8"]   # отслеживаем оба квантования
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-PRICE_FILE = "last_price.json"
+STATE_FILE = "price_state.json"
+
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     response = requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": msg})
-    print(f"ОТВЕТ TELEGRAM: {response.status_code} - {response.text}")
+    print(f"ОТВЕТ TELEGRAM: {response.status_code}")
 
-def get_price():
+
+def get_prices():
+    """Возвращает {квантование: цена} для всех интересующих нас вариантов."""
     url = f"https://openrouter.ai/api/v1/models/{TARGET_MODEL}/endpoints"
+    result = {}
     try:
         res = requests.get(url, timeout=10)
         if res.status_code != 200:
-            print(f"Ошибка API: {res.status_code} - {res.text}")
-            return None
-            
+            print(f"Ошибка API: {res.status_code}")
+            return result
+
         data = res.json().get("data", {})
         endpoints = data.get("endpoints", [])
-        
-        if not endpoints:
-            print("❌ Список провайдеров для этой модели пуст.")
-            return None
-            
-        print(f"✅ Модель {TARGET_MODEL} найдена. Доступные провайдеры:")
-        
-        baidu_prices = []  # сюда собираем все цены от Baidu
+
         for endpoint in endpoints:
-            prov_name = endpoint.get("provider_name")
-            # Если это Baidu, сохраняем цену и информацию о квантовании
-            if prov_name == TARGET_PROVIDER:
+            if endpoint.get("provider_name") != TARGET_PROVIDER:
+                continue
+            quant = (endpoint.get("quantization") or "").lower()
+            if quant in TARGET_QUANTS:
                 price = float(endpoint["pricing"]["prompt"])
-                # Пытаемся получить название эндпоинта или квантование
-                quant = endpoint.get("quantization", "unknown")
-                name = endpoint.get("name", "unnamed")
-                baidu_prices.append((price, quant, name))
-                print(f"  🔍 Найден Baidu: цена={price}, квантование={quant}, имя={name}")
-        
-        if not baidu_prices:
-            print(f"❌ Провайдер {TARGET_PROVIDER} не найден среди эндпоинтов.")
-            return None
-        
-        # Выбираем самый дешёвый вариант
-        cheapest = min(baidu_prices, key=lambda x: x[0])
-        print(f"✅ Выбран самый дешёвый Baidu: цена={cheapest[0]}, квантование={cheapest[1]}, имя={cheapest[2]}")
-        return cheapest[0]
-                
+                # Если по одному квантованию несколько вариантов — берем самый дешевый
+                if quant not in result or price < result[quant]:
+                    result[quant] = price
+                    print(f"  🔍 {quant}: цена={price}")
     except Exception as e:
-        print("Ошибка при запросе:", e)
-    return None
+        print("Ошибка:", e)
+    return result
+
 
 def main():
-    current = get_price()
-    if current is None:
-        print(f"Модель {TARGET_MODEL} или провайдер {TARGET_PROVIDER} не найдены.")
+    prices = get_prices()
+    if not prices:
+        print("Ничего не найдено.")
         return
 
-    last = None
-    if os.path.exists(PRICE_FILE):
-        with open(PRICE_FILE, "r") as f:
-            data = json.load(f)
-            last = data.get(f"{TARGET_MODEL}_{TARGET_PROVIDER}")
+    # Загружаем состояние
+    state = {}
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r") as f:
+                state = json.load(f)
+        except Exception:
+            state = {}
 
-    if last is not None and current < last:
-        msg = f"🔥 Скидка у {TARGET_PROVIDER}!\nМодель: {TARGET_MODEL}\nБыло: {last} USD\nСтало: {current} USD"
-        send_telegram(msg)
-        print(msg)
-    else:
-        print(f"Цена не изменилась. Текущая: {current}")
+    for quant in TARGET_QUANTS:
+        if quant not in prices:
+            print(f"⚠️ Квантование {quant} не найдено у {TARGET_PROVIDER}.")
+            continue
 
-    with open(PRICE_FILE, "w") as f:
-        json.dump({f"{TARGET_MODEL}_{TARGET_PROVIDER}": current}, f)
+        current = prices[quant]
+        key = f"{TARGET_MODEL}_{TARGET_PROVIDER}_{quant}"
+        entry = state.get(key, {})
+        last_price = entry.get("price")
+        discount_active = entry.get("discount_active", False)
+
+        # Логика уведомлений
+        if last_price is not None:
+            if current < last_price and not discount_active:
+                send_telegram(
+                    f"🔥 Скидка! {TARGET_MODEL} ({quant})\n"
+                    f"Было: {last_price}\nСтало: {current}"
+                )
+                discount_active = True
+            elif current > last_price and discount_active:
+                send_telegram(
+                    f"😢 Скидка закончилась. {TARGET_MODEL} ({quant})\n"
+                    f"Было: {last_price}\nСтало: {current}"
+                )
+                discount_active = False
+            else:
+                print(f"{quant}: цена не изменилась ({current}).")
+        else:
+            print(f"{quant}: первое сохранение цены ({current}).")
+
+        # Обновляем состояние
+        state[key] = {"price": current, "discount_active": discount_active}
+
+    # Сохраняем
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
 
 if __name__ == "__main__":
     main()
