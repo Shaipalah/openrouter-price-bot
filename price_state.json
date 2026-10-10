@@ -1,7 +1,7 @@
 {
   "z-ai/glm-5.2_Baidu_fp4": {
-    "price": 7.5825e-07,
-    "discount_active": true
+    "price": 2.25e-06,
+    "discount_active": false
   },
   "z-ai/glm-5.2_Baidu_fp8": {
     "price": 1.4e-06,
