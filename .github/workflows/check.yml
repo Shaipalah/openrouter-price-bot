@@ -2,7 +2,6 @@ name: OpenRouter Price Check
 
 on:
   schedule:
-    - cron: '15 * * * *' # Запускать каждый час (в 0 минут)
   workflow_dispatch: # Позволяет запустить вручную кнопкой
 
 jobs:
